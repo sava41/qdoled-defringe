@@ -22,6 +22,106 @@
 #define RESIZE(x, y) realloc(x, (y) * sizeof(*x));
 #define RELEASE_IF_NOT_NULL(x) { if (x != NULL) { x->Release(); } }
 
+#define LOG_FILE_PATH R"(C:\DWMLOG\dwm.log)"
+#define MAX_LOG_FILE_SIZE 20 * 1024 * 1024
+#define DEBUG_MODE true
+
+#if DEBUG_MODE == true
+#define __LOG_ONLY_ONCE(x, y) if (static bool first_log_##y = true) { log_to_file(x); first_log_##y = false; }
+#define _LOG_ONLY_ONCE(x, y) __LOG_ONLY_ONCE(x, y)
+#define LOG_ONLY_ONCE(x) _LOG_ONLY_ONCE(x, __COUNTER__)
+#define MESSAGE_BOX_DBG(x, y) MessageBoxA(NULL, x, "DEBUG HOOK DWM", y);
+
+#define EXECUTE_WITH_LOG(winapi_func_hr) \
+	do { \
+		HRESULT hr = (winapi_func_hr); \
+		if (FAILED(hr)) \
+		{ \
+			std::stringstream ss; \
+			ss << "ERROR AT LINE: " << __LINE__ << " HR: " << hr << " - DETAILS: "; \
+			LPSTR error_message = nullptr; \
+			FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, \
+				NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&error_message, 0, NULL); \
+			ss << error_message; \
+			log_to_file(ss.str().c_str()); \
+			LocalFree(error_message); \
+			throw std::exception(ss.str().c_str()); \
+		} \
+	} while (false);
+
+#define EXECUTE_D3DCOMPILE_WITH_LOG(winapi_func_hr, error_interface) \
+	do { \
+		HRESULT hr = (winapi_func_hr); \
+		if (FAILED(hr)) \
+		{ \
+			std::stringstream ss; \
+			ss << "ERROR AT LINE: " << __LINE__ << " HR: " << hr << " - DETAILS: "; \
+			LPSTR error_message = nullptr; \
+			FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, \
+				NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&error_message, 0, NULL); \
+			ss << error_message << " - DX COMPILE ERROR: " << (char*)error_interface->GetBufferPointer(); \
+			error_interface->Release(); \
+			log_to_file(ss.str().c_str()); \
+			LocalFree(error_message); \
+			throw std::exception(ss.str().c_str()); \
+		} \
+	} while (false);
+
+#define LOG_ADDRESS(prefix_message, address) \
+	{ \
+		std::stringstream ss; \
+		ss << prefix_message << " 0x" << std::setw(sizeof(address) * 2) << std::setfill('0') << std::hex << (UINT_PTR)address; \
+		log_to_file(ss.str().c_str()); \
+	}
+
+#else
+#define LOG_ONLY_ONCE(x) // NOP, not in debug mode
+#define MESSAGE_BOX_DBG(x, y) // NOP, not in debug mode
+#define EXECUTE_WITH_LOG(winapi_func_hr) winapi_func_hr;
+#define EXECUTE_D3DCOMPILE_WITH_LOG(winapi_func_hr, error_interface) winapi_func_hr;
+#define LOG_ADDRESS(prefix_message, address) // NOP, not in debug mode
+#endif
+
+
+#if DEBUG_MODE == true
+void print_error(const char* prefix_message)
+{
+	DWORD errorCode = GetLastError();
+	LPSTR errorMessage = nullptr;
+	FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+				nullptr, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&errorMessage, 0, nullptr);
+
+	char message_buf[100];
+	sprintf(message_buf, "%s: %s - error code: %u", prefix_message, errorMessage, errorCode);
+	MESSAGE_BOX_DBG(message_buf, MB_OK | MB_ICONWARNING)
+	return;
+}
+
+void log_to_file(const char* log_buf)
+{
+	FILE* pFile = fopen(LOG_FILE_PATH, "a");
+	if (pFile == NULL)
+	{
+		// print_error("Error during logging"); // Comment out to prevent UI freeze when used inside hooked functions
+		return;
+	}
+	fseek(pFile, 0, SEEK_END);
+	long size = ftell(pFile);
+	if (size > MAX_LOG_FILE_SIZE)
+	{
+		if (_chsize(_fileno(pFile), 0) == -1)
+		{
+			fclose(pFile);
+			return;
+		}
+	}
+	fseek(pFile, 0, SEEK_END);
+	fprintf(pFile, "%s\n", log_buf);
+	fclose(pFile);
+}
+#endif
+
+
 const unsigned char COverlayContext_Present_bytes[] = {
 	0x48, 0x89, 0x5c, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x57, 0x48, 0x83, 0xec, 0x40, 0x48, 0x8b, 0xb1, 0x20,
 	0x2c, 0x00, 0x00, 0x45, 0x8b, 0xd0, 0x48, 0x8b, 0xfa, 0x48, 0x8b, 0xd9, 0x48, 0x85, 0xf6, 0x0f, 0x85
@@ -117,7 +217,7 @@ float4 PS(VS_OUTPUT input) : SV_TARGET{
 	float3 sample = backBufferTex.Sample(smp, input.tex).rgb;
 	float3 sampleOffset = backBufferTex.Sample(smp, input.tex - offset).rgb;
 
-	sample.g = (1 - ratio) * sample.g + ratio * sampleOffset.g;
+	sample.g = 0;(1 - ratio) * sample.g + ratio * sampleOffset.g;
 
 	return float4(sample, 1);
 }
@@ -446,6 +546,8 @@ long COverlayContext_Present_hook(void* self, void* overlaySwapChain, unsigned i
 {
 	if (_ReturnAddress() < (void*)COverlayContext_Present_real_orig)
 	{
+		LOG_ONLY_ONCE("I am inside COverlayContext::Present hook inside the main if condition")
+
 		if (isWindows11 && *((bool*)overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset_w11) ||
 			!isWindows11 && *((bool*)overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset))
 		{
@@ -453,6 +555,7 @@ long COverlayContext_Present_hook(void* self, void* overlaySwapChain, unsigned i
 			hw_protection_message << "I'm inside the Hardware protection condition - 0x" << std::hex << (bool*)
 				overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset_w11 << " - value: 0x" << *((bool*)
 					overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset_w11);
+			LOG_ONLY_ONCE(hw_protection_message.str().c_str())
 			UnsetLUTActive(self);
 		}
 		else
@@ -461,10 +564,12 @@ long COverlayContext_Present_hook(void* self, void* overlaySwapChain, unsigned i
 			hw_protection_message << "I'm outside the Hardware protection condition - 0x" << std::hex << (bool*)
 				overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset_w11 << " - value: 0x" << *((bool*)
 					overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset_w11);
+			LOG_ONLY_ONCE(hw_protection_message.str().c_str())
 
 			IDXGISwapChain* swapChain;
 			if (isWindows11)
 			{
+				LOG_ONLY_ONCE("Gathering IDXGISwapChain pointer")
 				int sub_from_legacy_swapchain = *(int*)((unsigned char*)overlaySwapChain - 4);
 				void* real_overlay_swap_chain = (unsigned char*)overlaySwapChain - sub_from_legacy_swapchain -
 					0x1b0;
@@ -479,10 +584,12 @@ long COverlayContext_Present_hook(void* self, void* overlaySwapChain, unsigned i
 
 			if (ApplyLUT(self, swapChain, rectVec->start, rectVec->end - rectVec->start))
 			{
+				LOG_ONLY_ONCE("Setting LUTactive")
 				SetLUTActive(self);
 			}
 			else
 			{
+				LOG_ONLY_ONCE("Un-setting LUTactive")
 				UnsetLUTActive(self);
 			}
 		}
@@ -521,6 +628,8 @@ bool COverlayContext_OverlaysEnabled_hook(void* self)
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
 {
+	MESSAGE_BOX_DBG("HEHE", MB_OK)
+	printf("lel\n");
 	switch (fdwReason)
 	{
 	case DLL_PROCESS_ATTACH:
@@ -633,6 +742,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
 			        COverlayContext_Present_orig,
 			        COverlayContext_IsCandidateDirectFlipCompatbile_orig, COverlayContext_OverlaysEnabled_orig);
 
+			MESSAGE_BOX_DBG(variable_message_states, MB_OK)
+
 			if (COverlayContext_Present_orig && COverlayContext_IsCandidateDirectFlipCompatbile_orig &&
 				COverlayContext_OverlaysEnabled_orig)
 
@@ -646,6 +757,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
 				MH_CreateHook((PVOID)COverlayContext_OverlaysEnabled_orig, (PVOID)COverlayContext_OverlaysEnabled_hook,
 				              (PVOID*)&COverlayContext_OverlaysEnabled_orig);
 				MH_EnableHook(MH_ALL_HOOKS);
+				LOG_ONLY_ONCE("DWM HOOK DLL INITIALIZATION. START LOGGING")
+				MESSAGE_BOX_DBG("DWM HOOK INITIALIZATION", MB_OK)
 				break;
 			}
 			return FALSE;
