@@ -1,0 +1,56 @@
+﻿<Window x:Class="QOD.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:QOD"
+        mc:Ignorable="d"
+        Title="QD OLED Defringer" Height="200" Width="355" MinHeight="200" MinWidth="300">
+    <Window.DataContext>
+        <local:MainViewModel />
+    </Window.DataContext>
+    <DockPanel>
+        <StatusBar DockPanel.Dock="bottom">
+            <TextBlock Text="{Binding ActiveText, StringFormat=Status: {0}}" />
+        </StatusBar>
+        <DockPanel Margin="6">
+            <Grid DockPanel.Dock="Bottom">
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button IsEnabled="{Binding CanApply}" Content="Enable" Width="75" Margin="0,0,6,0"
+                            Click="Apply_Click" />
+                    <Button Content="Disable" Width="75" IsEnabled="{Binding IsActive}"
+                            Click="Disable_Click" />
+                </WrapPanel>
+            </Grid>
+            <DataGrid SelectedItem="{Binding SelectedMonitor}" ItemsSource="{Binding Monitors}" RowHeaderWidth="0"
+                      IsReadOnly="{Binding IsActive}" AutoGenerateColumns="False" DockPanel.Dock="Bottom" Margin="0,0,0,6"
+                      CanUserReorderColumns="False" CanUserSortColumns="False" CanUserResizeColumns="False" HorizontalScrollBarVisibility="Disabled">
+                
+                <DataGrid.Columns>
+                    <DataGridTextColumn Width="10" Header="#" Binding="{Binding SourceId}" IsReadOnly="True" />
+                    <DataGridTextColumn Width="110" Header="Name" Binding="{Binding Name}" IsReadOnly="True" />
+                    <DataGridTextColumn Width="110" Header="Connector" Binding="{Binding Connector}" IsReadOnly="True" />
+                    <DataGridTextColumn Header="Filter Strength">
+                        <DataGridTextColumn.Binding>
+                            <Binding Path="FilterStrength" StringFormat="{}{0:F2}">
+                                <Binding.ValidationRules>
+                                    <local:RangeValidationRule Minimum="0.0" Maximum="1.0"/>
+                                </Binding.ValidationRules>
+                            </Binding>
+                        </DataGridTextColumn.Binding>
+                    </DataGridTextColumn>
+                </DataGrid.Columns>
+
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Resources>
+                            <!-- Override highlight color when the row is selected -->
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="{x:Static SystemColors.ControlTextColor}"/>
+                        </Style.Resources>
+                    </Style>
+                </DataGrid.RowStyle>
+            </DataGrid>
+        </DockPanel>
+    </DockPanel>
+</Window>
