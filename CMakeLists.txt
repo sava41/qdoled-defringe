@@ -14,5 +14,5 @@ set(CMAKE_INSTALL_LIBRARY_DIR   "bin/")
 set(CMAKE_INSTALL_INCLUDE_DIR   "include/")
 set(CMAKE_INSTALL_EXPORT_DIR    "cmake/")
 
-add_subdirectory(dll)
-add_subdirectory(gui)
+add_subdirectory(source/dll)
+add_subdirectory(source/gui)
