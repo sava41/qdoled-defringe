@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 3.19)
+project(QdOledDefringe LANGUAGES CSharp CXX)
+
 set(CMAKE_CXX_STANDARD 20)
-include(FetchContent)
 
-project(QdOledDefringe)
+set(CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION "v4.8")
+set(CMAKE_CSharp_FLAGS "/platform:x64")
+set(CMAKE_CSharp_FLAGS "/langversion:8")
 
-FetchContent_Declare(
-  MinHook
-  GIT_REPOSITORY https://github.com/TsudaKageyu/minhook.git
-  GIT_TAG master
-)
-FetchContent_MakeAvailable(MinHook)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/binaries/")
+
+set(CMAKE_INSTALL_BINARY_DIR    "bin/")
+set(CMAKE_INSTALL_LIBRARY_DIR   "bin/")
+set(CMAKE_INSTALL_INCLUDE_DIR   "include/")
+set(CMAKE_INSTALL_EXPORT_DIR    "cmake/")
 
 add_subdirectory(dll)
+add_subdirectory(gui)

@@ -3,9 +3,6 @@ using System.Windows.Input;
 
 namespace QOD
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
     public partial class App
     {
         public static KeyboardListener KListener = new KeyboardListener();
