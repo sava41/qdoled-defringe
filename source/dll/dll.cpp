@@ -282,14 +282,14 @@ void DrawRectangle(struct tagRECT* rect, int index)
 	deviceContext->Draw(numVerts, 0);
 }
 
-int numLutTargets;
-void** lutTargets;
+int numFilterTargets;
+void **filterTargets;
 
-bool IsLUTActive(void* target)
+bool IsFilterActive(void *target)
 {
-	for (int i = 0; i < numLutTargets; i++)
+	for (int i = 0; i < numFilterTargets; i++)
 	{
-		if (lutTargets[i] == target)
+		if (filterTargets[i] == target)
 		{
 			return true;
 		}
@@ -297,24 +297,23 @@ bool IsLUTActive(void* target)
 	return false;
 }
 
-void SetLUTActive(void* target)
+void SetFilterActive(void *target)
 {
-	if (!IsLUTActive(target))
+	if (!IsFilterActive(target))
 	{
-		lutTargets = (void**)RESIZE(lutTargets, numLutTargets + 1)
-		lutTargets[numLutTargets++] = target;
+		filterTargets = (void **)RESIZE(filterTargets, numFilterTargets + 1)
+			filterTargets[numFilterTargets++] = target;
 	}
 }
 
-void UnsetLUTActive(void* target)
+void UnsetFilterActive(void *target)
 {
-	for (int i = 0; i < numLutTargets; i++)
+	for (int i = 0; i < numFilterTargets; i++)
 	{
-		if (lutTargets[i] == target)
+		if (filterTargets[i] == target)
 		{
-			lutTargets[i] = lutTargets[--numLutTargets];
-			lutTargets = (void**)RESIZE(lutTargets, numLutTargets)
-			return;
+			filterTargets[i] = filterTargets[--numFilterTargets];
+			filterTargets = (void **)RESIZE(filterTargets, numFilterTargets) return;
 		}
 	}
 }
@@ -419,10 +418,10 @@ void UninitializeStuff()
 		RELEASE_IF_NOT_NULL(textureView[i])
 	}
 	RELEASE_IF_NOT_NULL(constantBuffer)
-	free(lutTargets);
+	free(filterTargets);
 }
 
-bool ApplyLUT(void* cOverlayContext, IDXGISwapChain* swapChain, struct tagRECT* rects, int numRects)
+bool ApplyFilter(void *cOverlayContext, IDXGISwapChain *swapChain, struct tagRECT *rects, int numRects)
 {
 	try
 	{
@@ -556,7 +555,7 @@ long COverlayContext_Present_hook(void* self, void* overlaySwapChain, unsigned i
 				overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset_w11 << " - value: 0x" << *((bool*)
 					overlaySwapChain + IOverlaySwapChain_HardwareProtected_offset_w11);
 			LOG_ONLY_ONCE(hw_protection_message.str().c_str())
-			UnsetLUTActive(self);
+			UnsetFilterActive(self);
 		}
 		else
 		{
@@ -582,15 +581,13 @@ long COverlayContext_Present_hook(void* self, void* overlaySwapChain, unsigned i
 					IOverlaySwapChain_IDXGISwapChain_offset);
 			}
 
-			if (ApplyLUT(self, swapChain, rectVec->start, rectVec->end - rectVec->start))
+			if (ApplyFilter(self, swapChain, rectVec->start, rectVec->end - rectVec->start))
 			{
-				LOG_ONLY_ONCE("Setting LUTactive")
-				SetLUTActive(self);
+				SetFilterActive(self);
 			}
 			else
 			{
-				LOG_ONLY_ONCE("Un-setting LUTactive")
-				UnsetLUTActive(self);
+				UnsetFilterActive(self);
 			}
 		}
 	}
@@ -606,7 +603,7 @@ COverlayContext_IsCandidateDirectFlipCompatbile_t* COverlayContext_IsCandidateDi
 bool COverlayContext_IsCandidateDirectFlipCompatbile_hook(void* self, void* a2, void* a3, void* a4, int a5,
                                                           unsigned int a6, bool a7, bool a8)
 {
-	if (IsLUTActive(self))
+	if (IsFilterActive(self))
 	{
 		return false;
 	}
@@ -619,7 +616,7 @@ COverlayContext_OverlaysEnabled_t* COverlayContext_OverlaysEnabled_orig;
 
 bool COverlayContext_OverlaysEnabled_hook(void* self)
 {
-	if (IsLUTActive(self))
+	if (IsFilterActive(self))
 	{
 		return false;
 	}
@@ -628,8 +625,6 @@ bool COverlayContext_OverlaysEnabled_hook(void* self)
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
 {
-	MESSAGE_BOX_DBG("HEHE", MB_OK)
-	printf("lel\n");
 	switch (fdwReason)
 	{
 	case DLL_PROCESS_ATTACH:
