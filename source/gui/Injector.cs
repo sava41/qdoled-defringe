@@ -71,10 +71,19 @@ namespace QOD
         public static void Inject(IEnumerable<MonitorData> monitors)
         {
             string DllFullPath = DllBasePath;
-            
+            int i = 0;
             foreach (var monitor in monitors)
             {
-                DllFullPath += "-" + monitor.FilterStrength.ToString("0.00");
+                if(i == 0)
+                {
+                    DllFullPath += "_";
+                } else 
+                {
+                    DllFullPath += "-";
+                }
+                int strength = Convert.ToInt32(monitor.FilterStrength * 100.0);
+                DllFullPath += strength.ToString() + "-" + monitor.Position;
+                i++;
             }
             DllFullPath += ".dll";
 

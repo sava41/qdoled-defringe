@@ -203,6 +203,9 @@ struct VS_OUTPUT {
 Texture2D backBufferTex : register(t0);
 SamplerState smp : register(s0);
 
+float resolutionY : register(b0);
+float filterStrength : register(b1);
+
 VS_OUTPUT VS(VS_INPUT input) {
 	VS_OUTPUT output;
 	output.pos = float4(input.pos, 0, 1);
@@ -211,13 +214,12 @@ VS_OUTPUT VS(VS_INPUT input) {
 }
 
 float4 PS(VS_OUTPUT input) : SV_TARGET{
-	float ratio = 0.35;
-	float2 offset = float2(0.0, 1/1440.0);
+	float2 offset = float2(0.0, 1/floor(resolutionY));
 	
 	float3 sample = backBufferTex.Sample(smp, input.tex).rgb;
 	float3 sampleOffset = backBufferTex.Sample(smp, input.tex - offset).rgb;
 
-	sample.g = 0;(1 - ratio) * sample.g + ratio * sampleOffset.g;
+	sample.g = (1 - filterStrength) * sample.g + filterStrength * sampleOffset.g;
 
 	return float4(sample, 1);
 }
@@ -280,6 +282,34 @@ void DrawRectangle(struct tagRECT* rect, int index)
 	deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
 
 	deviceContext->Draw(numVerts, 0);
+}
+
+struct monitorData
+{
+	int left;
+	int top;
+	float filterStrength;
+	ID3D11ShaderResourceView *textureView;
+};
+
+int numMonitors;
+monitorData *monitors;
+
+bool ParseSettings()
+{
+	TCHAR dllPath[MAX_PATH];
+	HMODULE hModule = NULL;
+	GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCTSTR)ParseSettings, &hModule);
+
+	if (GetModuleFileName(hModule, dllPath, MAX_PATH))
+	{
+		MESSAGE_BOX_DBG(dllPath, MB_OK);
+	}
+	else
+	{
+		return false;
+	}
+	return true;
 }
 
 int numFilterTargets;
@@ -494,6 +524,16 @@ bool ApplyFilter(void *cOverlayContext, IDXGISwapChain *swapChain, struct tagREC
 
 		deviceContext->PSSetShaderResources(0, 1, &textureView[index]);
 		deviceContext->PSSetSamplers(0, 1, &samplerState);
+
+		float textureHeight = textureDesc[index].Height;
+		float constantData[2] = {textureHeight, 0.5};
+
+		D3D11_MAPPED_SUBRESOURCE resource;
+		deviceContext->Map((ID3D11Resource *)constantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+		memcpy(resource.pData, constantData, sizeof(constantData));
+		deviceContext->Unmap((ID3D11Resource *)constantBuffer, 0);
+
+		deviceContext->PSSetConstantBuffers(0, 1, &constantBuffer);
 
 		for (int i = 0; i < numRects; i++)
 		{
@@ -730,7 +770,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
 					}
 				}
 			}
-
+			if (!ParseSettings())
+			{
+				return FALSE;
+			}
 			char variable_message_states[300];
 			sprintf(variable_message_states, "Current variable states: COverlayContext::Present - %p\t"
 			        "COverlayContext::IsCandidateDirectFlipCompatible - %p\tCOverlayContext::OverlaysEnabled - %p",

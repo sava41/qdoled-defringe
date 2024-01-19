@@ -16,12 +16,13 @@ namespace QOD
 
         private float _filterStrength;
 
-        public MonitorData(string devicePath, uint sourceId, string name, string connector, float filterStrength)
+        public MonitorData(string devicePath, uint sourceId, string name, string connector, string position, float filterStrength)
         {
             DevicePath = devicePath;
             SourceId = sourceId;
             Name = name;
             Connector = connector;
+            Position = position;
             FilterStrength = filterStrength;
         }
 
@@ -34,6 +35,7 @@ namespace QOD
         public uint SourceId { get; }
         public string Name { get; }
         public string Connector { get; }
+        public string Position { get; }
         public float FilterStrength
         {
             set

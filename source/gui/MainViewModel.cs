@@ -109,9 +109,9 @@ namespace QOD
                     connector = "DisplayPort";
                 }
 
-                var position = path.Position.X + "," + path.Position.Y;
+                var position = path.Position.X + "-" + path.Position.Y;
 
-                var monitor = new MonitorData(devicePath, path.DisplaySource.SourceId + 1, name, connector, 1.0f);
+                var monitor = new MonitorData(devicePath, path.DisplaySource.SourceId + 1, name, connector, position, 1.0f);
                 _allMonitors.Add(monitor);
                 Monitors.Add(monitor);
             }
