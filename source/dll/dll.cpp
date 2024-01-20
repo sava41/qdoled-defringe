@@ -214,7 +214,7 @@ VS_OUTPUT VS(VS_INPUT input) {
 }
 
 float4 PS(VS_OUTPUT input) : SV_TARGET{
-	float2 offset = float2(0.0, 1/floor(resolutionY));
+	float2 offset = float2(0.0, 1.0/floor(resolutionY));
 	
 	float3 sample = backBufferTex.Sample(smp, input.tex).rgb;
 	float3 sampleOffset = backBufferTex.Sample(smp, input.tex - offset).rgb;
@@ -289,7 +289,6 @@ struct monitorData
 	int left;
 	int top;
 	float filterStrength;
-	ID3D11ShaderResourceView *textureView;
 };
 
 int numMonitors;
@@ -297,19 +296,64 @@ monitorData *monitors;
 
 bool ParseSettings()
 {
-	TCHAR dllPath[MAX_PATH];
+	char dllPath[MAX_PATH];
 	HMODULE hModule = NULL;
 	GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCTSTR)ParseSettings, &hModule);
 
-	if (GetModuleFileName(hModule, dllPath, MAX_PATH))
-	{
-		MESSAGE_BOX_DBG(dllPath, MB_OK);
-	}
-	else
+	if (!GetModuleFileName(hModule, dllPath, MAX_PATH))
 	{
 		return false;
 	}
-	return true;
+
+	int numSettings = 0;
+	int *settings = NULL;
+	int curr_setting = 0;
+	char *settings_str = strstr(dllPath, "dwm_qod-") + sizeof(char) * 8;
+	while (*settings_str != '.')
+	{
+		if (isdigit(*settings_str))
+		{
+			int curr_num = *settings_str - '0';
+			curr_setting = 10 * curr_setting + curr_num;
+		}
+
+		if (*(settings_str + 1) == '-' || *(settings_str + 1) == '.')
+		{
+			settings = (int *)RESIZE(settings, numSettings + 1);
+			settings[numSettings] = curr_setting;
+			curr_setting = 0;
+			++numSettings;
+		}
+
+		++settings_str;
+	}
+
+	bool res = true;
+
+	if (numSettings > 0 && (numSettings % 3) == 0)
+	{
+		for (int i = 0; i < numSettings / 3; ++i)
+		{
+			monitors = (monitorData *)RESIZE(monitors, numMonitors + 1);
+			monitorData *monitor = &monitors[numMonitors];
+			++numMonitors;
+
+			monitor->filterStrength = settings[0 + 3 * i] / 200.0;
+			monitor->left = settings[1 + 3 * i];
+			monitor->top = settings[2 + 3 * i];
+		}
+	}
+	else
+	{
+		res = false;
+	}
+
+	if (settings != NULL)
+	{
+		free(settings);
+	}
+
+	return res;
 }
 
 int numFilterTargets;
@@ -346,6 +390,32 @@ void UnsetFilterActive(void *target)
 			filterTargets = (void **)RESIZE(filterTargets, numFilterTargets) return;
 		}
 	}
+}
+
+monitorData *GetMonitorDataFromCOverlayContext(void *context, bool hdr)
+{
+	int left, top;
+	if (isWindows11)
+	{
+		float *rect = (float *)((unsigned char *)*(void **)context + COverlayContext_DeviceClipBox_offset_w11);
+		left = (int)rect[0];
+		top = (int)rect[1];
+	}
+	else
+	{
+		int *rect = (int *)((unsigned char *)context + COverlayContext_DeviceClipBox_offset);
+		left = rect[0];
+		top = rect[1];
+	}
+
+	for (int i = 0; i < numMonitors; i++)
+	{
+		if (monitors[i].left == left && monitors[i].top == top)
+		{
+			return &monitors[i];
+		}
+	}
+	return NULL;
 }
 
 void InitializeStuff(IDXGISwapChain* swapChain)
@@ -448,7 +518,14 @@ void UninitializeStuff()
 		RELEASE_IF_NOT_NULL(textureView[i])
 	}
 	RELEASE_IF_NOT_NULL(constantBuffer)
-	free(filterTargets);
+	if (numMonitors > 0)
+	{
+		free(monitors);
+	}
+	if (numFilterTargets > 0)
+	{
+		free(filterTargets);
+	}
 }
 
 bool ApplyFilter(void *cOverlayContext, IDXGISwapChain *swapChain, struct tagRECT *rects, int numRects)
@@ -477,6 +554,13 @@ bool ApplyFilter(void *cOverlayContext, IDXGISwapChain *swapChain, struct tagREC
 		else if (newBackBufferDesc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT)
 		{
 			index = 1;
+		}
+
+		monitorData *monitor;
+		if (index == -1 || !(monitor = GetMonitorDataFromCOverlayContext(cOverlayContext, index == 1)))
+		{
+			backBuffer->Release();
+			return false;
 		}
 
 		D3D11_TEXTURE2D_DESC oldTextureDesc = textureDesc[index];
@@ -526,7 +610,7 @@ bool ApplyFilter(void *cOverlayContext, IDXGISwapChain *swapChain, struct tagREC
 		deviceContext->PSSetSamplers(0, 1, &samplerState);
 
 		float textureHeight = textureDesc[index].Height;
-		float constantData[2] = {textureHeight, 0.5};
+		float constantData[2] = {textureHeight, monitor->filterStrength};
 
 		D3D11_MAPPED_SUBRESOURCE resource;
 		deviceContext->Map((ID3D11Resource *)constantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
@@ -783,7 +867,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved)
 			MESSAGE_BOX_DBG(variable_message_states, MB_OK)
 
 			if (COverlayContext_Present_orig && COverlayContext_IsCandidateDirectFlipCompatbile_orig &&
-				COverlayContext_OverlaysEnabled_orig)
+				COverlayContext_OverlaysEnabled_orig && numMonitors > 0)
 
 			{
 				MH_Initialize();
