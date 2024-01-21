@@ -203,8 +203,9 @@ struct VS_OUTPUT {
 Texture2D backBufferTex : register(t0);
 SamplerState smp : register(s0);
 
-float resolutionY : register(b0);
-float filterStrength : register(b1);
+float resolutionX : register(b0);
+float resolutionY : register(b1);
+float filterStrength : register(b2);
 
 VS_OUTPUT VS(VS_INPUT input) {
 	VS_OUTPUT output;
@@ -213,13 +214,24 @@ VS_OUTPUT VS(VS_INPUT input) {
 	return output;
 }
 
-float4 PS(VS_OUTPUT input) : SV_TARGET{
-	float2 offset = float2(0.0, 1.0/floor(resolutionY));
+float4 PS(VS_OUTPUT input) : SV_TARGET{	
+	float2 offsetY = float2(0.0, 1.0/floor(resolutionY));
+	float2 offsetX = float2(1.0/floor(resolutionX), 0.0);
+
+	// canny edge detection filter on Y axis
+	float edge = clamp(abs(2*backBufferTex.Sample(smp, input.tex - offsetY).g 
+	+ backBufferTex.Sample(smp, input.tex - offsetY + offsetX).g 
+	+ backBufferTex.Sample(smp, input.tex - offsetY - offsetX).g
+	- 2*backBufferTex.Sample(smp, input.tex + offsetY).g
+	- backBufferTex.Sample(smp, input.tex + offsetY + offsetX).g
+	- backBufferTex.Sample(smp, input.tex + offsetY - offsetX).g), 0.0, 1.0);
+
+	float finalStrength = filterStrength * edge;
 	
 	float3 sample = backBufferTex.Sample(smp, input.tex).rgb;
-	float3 sampleOffset = backBufferTex.Sample(smp, input.tex - offset).rgb;
+	float3 sampleOffset = backBufferTex.Sample(smp, input.tex - offsetY).rgb;
 
-	sample.g = (1 - filterStrength) * sample.g + filterStrength * sampleOffset.g;
+	sample.g = (1 - finalStrength) * sample.g + finalStrength * sampleOffset.g;
 
 	return float4(sample, 1);
 }
@@ -609,8 +621,9 @@ bool ApplyFilter(void *cOverlayContext, IDXGISwapChain *swapChain, struct tagREC
 		deviceContext->PSSetShaderResources(0, 1, &textureView[index]);
 		deviceContext->PSSetSamplers(0, 1, &samplerState);
 
+		float textureWidth = textureDesc[index].Width;
 		float textureHeight = textureDesc[index].Height;
-		float constantData[2] = {textureHeight, monitor->filterStrength};
+		float constantData[4] = {textureWidth, textureHeight, monitor->filterStrength};
 
 		D3D11_MAPPED_SUBRESOURCE resource;
 		deviceContext->Map((ID3D11Resource *)constantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
