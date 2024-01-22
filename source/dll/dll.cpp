@@ -306,13 +306,12 @@ struct monitorData
 int numMonitors;
 monitorData *monitors;
 
+extern "C" IMAGE_DOS_HEADER __ImageBase;
 bool ParseSettings()
 {
 	char dllPath[MAX_PATH];
-	HMODULE hModule = NULL;
-	GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCTSTR)ParseSettings, &hModule);
 
-	if (!GetModuleFileName(hModule, dllPath, MAX_PATH))
+	if (!GetModuleFileName((HMODULE)&__ImageBase, dllPath, MAX_PATH))
 	{
 		return false;
 	}
