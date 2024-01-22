@@ -7,6 +7,8 @@ add_executable(qod
   App.xaml.cs
   MainWindow.xaml
   MainWindow.xaml.cs
+  OverlayWindow.xaml
+  OverlayWindow.xaml.cs
   
   Injector.cs
   KeyboardUtils.cs
@@ -22,7 +24,9 @@ csharp_set_xaml_cs_properties(
   App.xaml
   App.xaml.cs
   MainWindow.xaml
-  MainWindow.xaml.cs 
+  MainWindow.xaml.cs
+  OverlayWindow.xaml
+  OverlayWindow.xaml.cs
 )
 
 set_property(SOURCE App.xaml PROPERTY VS_XAML_TYPE "ApplicationDefinition")

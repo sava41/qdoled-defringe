@@ -146,6 +146,7 @@ namespace QOD
             try
             {
                 _viewModel.Uninject();
+                RedrawScreens();
             }
             catch (Exception x)
             {
@@ -161,6 +162,7 @@ namespace QOD
             try
             {
                 _viewModel.ReInject();
+                RedrawScreens();
             }
             catch (Exception x)
             {
@@ -172,6 +174,22 @@ namespace QOD
                 Thread.Sleep(100);
                 _applyOnCooldown = false;
             });
+        }
+
+        private static void RedrawScreens()
+        {
+            var rect = Screen.AllScreens.Select(x => x.Bounds).Aggregate(Rectangle.Union);
+            var overlay = new OverlayWindow
+            {
+                Left = rect.Left,
+                Top = rect.Top,
+                Height = rect.Height,
+                Width = rect.Width,
+            };
+
+            overlay.Show();
+            Thread.Sleep(50);
+            overlay.Close();
         }
 
     }
