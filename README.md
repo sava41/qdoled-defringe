@@ -5,6 +5,8 @@ This app applies a screenwide filter that reduces the green/magenta fringe seen 
 	<img src="example.jpg" height="350" alt="before and after example photo">
 </p>
 
+## [Download latest release](https://github.com/lauralex/dwm_lut/releases/latest/download/Release.zip)
+
 ## App Features
  - Run in taskbar
  - Filter strength adjustment (I like to run it at 0.5)
@@ -20,7 +22,7 @@ This app applies a screenwide filter that reduces the green/magenta fringe seen 
  - DirectFlip and MPO get force disabled. These features are designed to improve performance for some windowed applications like video players.
  - May trigger antivirus.
 
- ## Compiling
+ ## Building
 **Requirements:**
   - CMake 3.19 or later
   - MSVC 2022
