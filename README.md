@@ -1,9 +1,6 @@
 # QD Oled Defringe
 This app applies a screenwide filter that reduces the green/magenta fringe seen on samsung display qd oled panels. It works by using DLL injection on the desktop windows manager; similar to how ReShade works for video games. Code is based on [dwm_lut](https://github.com/lauralex/dwm_lut).
-
-<p align="center">
-	<img src="example.jpg" height="350" alt="before and after example photo">
-</p>
+![before and after example photot](example.jpg?raw=true)
 
 ## [Download latest release](https://github.com/lauralex/dwm_lut/releases/latest/download/Release.zip)
 
